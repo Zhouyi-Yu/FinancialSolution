@@ -1,0 +1,17 @@
+# .NET
+bin/
+obj/
+.vscode/
+.idea/
+*.user
+*.suo
+*.swp
+
+# Node
+node_modules/
+dist/
+.DS_Store
+
+# Environment
+.env
+appsettings.Development.json
