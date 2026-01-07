@@ -1,0 +1,1157 @@
+Below is a **demo-ready SRS** (Software Requirements Specification) plus a complete set of **user stories with acceptance criteria** for **Personal Finance & Budget Tracking Dashboard** (Vue 3 + ASP.NET Core + PostgreSQL).
+
+---
+
+# Software Requirements Specification (SRS)
+
+## 1. Introduction
+
+### 1.1 Purpose
+
+This document specifies the functional and non-functional requirements for a web-based Personal Finance & Budget Tracking Dashboard. The system enables users to record income/expenses, categorize and tag transactions, view summaries and analytics, visualize trends, and import/export data via CSV. It is designed to be demo-ready and suitable as a portfolio project demonstrating full-stack skills.
+
+### 1.2 Scope
+
+**In scope**
+
+* User authentication
+* Transaction CRUD (expense/income)
+* Categories and tags management
+* Monthly summaries (income, expense, net, breakdowns)
+* Charts (category distribution, time trends)
+* Pagination/filtering/search
+* CSV import/export
+* Forecasting (simple trend)
+* Multi-currency (basic)
+* Optional shared budget access (role-based)
+
+**Out of scope (for demo)**
+
+* Bank account syncing (Plaid, etc.)
+* Tax filing features
+* Complex budgeting rules (envelopes, goals with carryover)
+* Mobile native apps
+
+### 1.3 Definitions
+
+* **Transaction**: A single income or expense record.
+* **Category**: A labeled bucket (e.g., “Food”, “Rent”).
+* **Tag**: A flexible label (e.g., “work”, “travel”).
+* **Budget Space**: A workspace (personal or shared) containing transactions/categories/tags.
+* **Forecast**: Estimated next month net based on past trend.
+
+### 1.4 Target Users
+
+* Individuals tracking personal spending
+* Small groups/families tracking shared expenses (stretch)
+
+---
+
+## 2. Overall Description
+
+### 2.1 Product Perspective
+
+A web application with:
+
+* SPA frontend (Vue 3 + Pinia)
+* REST API backend (ASP.NET Core Web API)
+* PostgreSQL database (EF Core)
+* Hosted on Azure/AWS (optional for demo)
+
+### 2.2 User Classes and Roles
+
+* **Owner**: Creates a budget space; full access.
+* **Editor**: Can add/edit/delete transactions; manage tags/categories (optional restriction).
+* **Viewer**: Read-only access to dashboards and transactions.
+
+*(For demo you can implement Owner-only first, then show RBAC support.)*
+
+### 2.3 Assumptions and Dependencies
+
+* Users access via modern browsers (Chrome/Edge/Safari/Firefox)
+* Email is used as login identifier
+* Currency conversion rates are either (a) manual fixed rates or (b) entered per transaction (demo-friendly)
+
+---
+
+## 3. System Features & Functional Requirements
+
+## 3.1 Authentication & Authorization
+
+### Description
+
+Users must authenticate to access any finance data. A user can own one or more budget spaces.
+
+**FR-AUTH-1**: Users can register with email + password.
+**FR-AUTH-2**: Users can log in and receive access token (JWT).
+**FR-AUTH-3**: Users can log out (client clears tokens).
+**FR-AUTH-4**: Users can view and update profile basics (name, default currency).
+**FR-AUTH-5**: Role-based access enforced per budget space (Owner/Editor/Viewer).
+
+---
+
+## 3.2 Budget Spaces (Personal + Shared)
+
+### Description
+
+A budget space isolates data (transactions, categories, tags).
+
+**FR-BS-1**: Users can create a budget space (name, base currency).
+**FR-BS-2**: Users can switch between budget spaces.
+**FR-BS-3**: Owner can invite members by email and assign roles (Editor/Viewer).
+**FR-BS-4**: Owner can change a member’s role or remove access.
+
+*(Invite flow can be “enter email -> system creates pending invite -> member accepts when logged in”, demo-friendly.)*
+
+---
+
+## 3.3 Transactions (Income/Expense CRUD)
+
+### Description
+
+Transactions are core records.
+
+**Transaction fields (minimum)**
+
+* id (UUID)
+* budgetSpaceId
+* type: Income | Expense
+* amount (decimal, > 0)
+* currency (ISO code, default = budget space base currency)
+* date (required)
+* categoryId (optional but recommended)
+* tags (0..N)
+* merchant/payee (optional)
+* note (optional)
+* createdAt, updatedAt
+
+**FR-TX-1**: Create transaction.
+**FR-TX-2**: Edit transaction.
+**FR-TX-3**: Delete transaction (soft delete recommended).
+**FR-TX-4**: List transactions with pagination.
+**FR-TX-5**: Filter transactions by:
+
+* date range
+* type
+* category
+* tag(s)
+* amount min/max
+* keyword search (merchant/note)
+  **FR-TX-6**: Sort transactions by date, amount, updatedAt.
+  **FR-TX-7**: Bulk actions:
+* bulk delete
+* bulk assign category
+* bulk add/remove tag
+
+---
+
+## 3.4 Categories
+
+### Description
+
+Categories help organize transactions.
+
+**Category fields**
+
+* id
+* budgetSpaceId
+* name (unique within budget space)
+* type: Income/Expense/Both (optional)
+
+**FR-CAT-1**: Create category.
+**FR-CAT-2**: Rename category.
+**FR-CAT-3**: Delete category (with safe behavior: either prevent if used, or allow and set categoryId to null).
+**FR-CAT-4**: List categories.
+
+---
+
+## 3.5 Tags
+
+### Description
+
+Tags are many-to-many labels for transactions.
+
+**FR-TAG-1**: Create tag.
+**FR-TAG-2**: Rename tag.
+**FR-TAG-3**: Delete tag.
+**FR-TAG-4**: Assign/unassign tags to transactions.
+**FR-TAG-5**: List tags with usage counts.
+
+---
+
+## 3.6 Monthly Summaries & Analytics
+
+### Description
+
+Dashboards provide aggregated insights.
+
+**FR-AN-1**: Monthly totals:
+
+* total income
+* total expense
+* net savings (income - expense)
+  **FR-AN-2**: Category breakdown per month (expense by category).
+  **FR-AN-3**: Trend data across months (e.g., last 6/12 months).
+  **FR-AN-4**: Top merchants/payees list.
+  **FR-AN-5**: Tag-based totals (optional).
+
+**Important implementation note:** Aggregations should be done in SQL (server-side), not computed entirely on client.
+
+---
+
+## 3.7 Charts & Visualization
+
+### Description
+
+Charts must update reactively when filters/month change.
+
+**FR-CH-1**: Pie/Donut chart: expense share by category (selected month).
+**FR-CH-2**: Line chart: net trend across months.
+**FR-CH-3**: Bar chart: income vs expense per month.
+**FR-CH-4**: Interactions:
+
+* click category slice filters transaction list
+* hover tooltips show exact totals
+* “reset filters” button
+
+---
+
+## 3.8 CSV Import/Export
+
+### Description
+
+Support import/export for portability.
+
+**FR-CSV-1**: Export transactions to CSV based on current filters (date range, type, etc.).
+**FR-CSV-2**: Import CSV with mapping:
+
+* required columns: date, type, amount
+* optional columns: currency, category, tags, merchant, note
+  **FR-CSV-3**: Import validation:
+* show preview (first N rows)
+* highlight invalid rows
+* allow user to confirm import
+  **FR-CSV-4**: Categories/tags auto-create if not exist (configurable; default ON).
+  **FR-CSV-5**: Provide an example CSV template for download.
+
+---
+
+## 3.9 Forecasting (Stretch)
+
+### Description
+
+Simple “next month forecast” based on linear trend of last N months net.
+
+**FR-FC-1**: System computes forecasted net for next month using linear regression on last 6 months net (or simpler average delta).
+**FR-FC-2**: Display forecast with explanation text and confidence indicator (basic).
+
+---
+
+## 3.10 Multi-currency (Stretch, demo-friendly)
+
+### Description
+
+Transactions may be recorded in different currencies but summarized in base currency.
+
+**FR-MC-1**: Each budget space has base currency.
+**FR-MC-2**: If transaction currency != base currency:
+
+* store exchangeRateToBase at creation time (manual input or default 1.0 if same currency)
+  **FR-MC-3**: Summaries use normalized amounts in base currency.
+
+---
+
+# 4. External Interface Requirements
+
+## 4.1 User Interface
+
+Pages (minimum demo set):
+
+* Login / Register
+* Budget Space switcher
+* Dashboard (charts + monthly summary)
+* Transactions list (table + filters + pagination)
+* Add/Edit Transaction modal
+* Categories & Tags management
+* Import/Export page
+
+UI behaviors:
+
+* Fast filtering (debounced search)
+* Empty states (no data)
+* Error + success toasts
+* Loading skeletons
+
+## 4.2 API Interfaces (High Level)
+
+Suggested endpoints (REST):
+
+* `POST /auth/register`, `POST /auth/login`
+* `GET /budgetSpaces`, `POST /budgetSpaces`
+* `GET /transactions`, `POST /transactions`, `PUT /transactions/{id}`, `DELETE /transactions/{id}`
+* `GET /categories`, `POST /categories`, `PUT /categories/{id}`, `DELETE /categories/{id}`
+* `GET /tags`, `POST /tags`, `PUT /tags/{id}`, `DELETE /tags/{id}`
+* `GET /analytics/monthlySummary?month=YYYY-MM`
+* `GET /analytics/trends?months=12`
+* `POST /csv/import`, `GET /csv/export`
+
+## 4.3 Database
+
+PostgreSQL schema supports:
+
+* Users
+* BudgetSpaces
+* BudgetSpaceMembers (role)
+* Transactions
+* Categories
+* Tags
+* TransactionTags (join)
+* Invites (optional)
+* ExchangeRateToBase stored in Transactions
+
+---
+
+# 5. Non-Functional Requirements
+
+### Performance
+
+* **NFR-P1**: Transactions list loads < 1s for 50 items on typical connection.
+* **NFR-P2**: Analytics endpoints return < 1s for 10k transactions (local demo target).
+
+### Security
+
+* **NFR-S1**: JWT auth required for all non-auth endpoints.
+* **NFR-S2**: Server validates ownership/membership for budget space access.
+* **NFR-S3**: Input validation for CSV import and all DTOs.
+
+### Reliability
+
+* **NFR-R1**: Soft delete to prevent accidental loss (recommended).
+* **NFR-R2**: Imports are transactional (all-or-nothing or row-level fail list).
+
+### Usability
+
+* **NFR-U1**: Mobile responsive layouts.
+* **NFR-U2**: Accessible labels for form controls.
+
+### Maintainability
+
+* **NFR-M1**: Clean layering:
+
+  * Controllers -> Services -> Repositories (optional) -> EF Core
+* **NFR-M2**: Frontend uses composables (filters, API client, chart adapters).
+
+---
+
+# 6. User Stories (Demo-Ready) + Acceptance Criteria
+
+## Epic A — Authentication
+
+### US-A1 Register
+
+**As a user**, I want to create an account so I can store my financial records.
+
+* **AC**
+
+  * Given valid email/password, when I submit, then account is created and I’m logged in
+  * Password policy enforced (min length, etc.)
+  * Errors show for duplicate email
+
+### US-A2 Login/Logout
+
+**As a user**, I want to log in/out securely.
+
+* **AC**
+
+  * Successful login returns JWT and loads my default budget space
+  * Logout clears tokens and returns to login page
+
+---
+
+## Epic B — Budget Space
+
+### US-B1 Create budget space
+
+**As a user**, I want to create a budget space with a base currency.
+
+* **AC**
+
+  * Can set name + base currency
+  * New space appears in switcher immediately
+
+### US-B2 Switch budget space
+
+**As a user**, I want to switch budget spaces so I can view separate data.
+
+* **AC**
+
+  * Switching updates dashboard + transaction list
+  * URL or app state reflects active space
+
+### US-B3 Invite member (stretch)
+
+**As an owner**, I want to invite someone to view/edit my budget.
+
+* **AC**
+
+  * Owner can input email and role
+  * Invited user sees the space after accepting invite
+
+---
+
+## Epic C — Transactions
+
+### US-C1 Add transaction
+
+**As a user**, I want to add an income/expense transaction.
+
+* **AC**
+
+  * Required: date, type, amount
+  * Amount must be > 0
+  * Optional: category, tags, merchant, note
+  * Transaction appears in list and affects summaries immediately
+
+### US-C2 Edit transaction
+
+**As a user**, I want to edit a transaction to fix mistakes.
+
+* **AC**
+
+  * Changes persist after refresh
+  * UpdatedAt changes (if shown)
+
+### US-C3 Delete transaction
+
+**As a user**, I want to delete a transaction I don’t need.
+
+* **AC**
+
+  * Confirmation required
+  * Deleted item no longer appears in list or analytics
+
+### US-C4 View paginated transaction list
+
+**As a user**, I want to view transactions with pagination.
+
+* **AC**
+
+  * List loads with default sort by date desc
+  * Page size selectable (10/25/50)
+  * Total count shown
+
+### US-C5 Filter & search transactions
+
+**As a user**, I want filters so I can find specific transactions.
+
+* **AC**
+
+  * Filters: date range, type, category, tags, amount min/max
+  * Keyword search matches merchant/note
+  * Filters persist while navigating within app
+
+### US-C6 Bulk update (nice demo feature)
+
+**As a user**, I want to bulk tag/categorize transactions.
+
+* **AC**
+
+  * Multi-select supported
+  * Bulk apply category and tags updates all selected
+
+---
+
+## Epic D — Categories & Tags
+
+### US-D1 Manage categories
+
+**As a user**, I want to create/edit/delete categories.
+
+* **AC**
+
+  * Category names must be unique within a budget space
+  * Deleting a used category either:
+
+    * is blocked with message, OR
+    * sets affected transactions category to null (choose one and document)
+
+### US-D2 Manage tags
+
+**As a user**, I want to create/edit/delete tags.
+
+* **AC**
+
+  * Tag list shows usage count
+  * Renaming tag updates all linked transactions
+
+---
+
+## Epic E — Dashboard & Analytics
+
+### US-E1 View monthly summary
+
+**As a user**, I want a monthly overview of income/expenses/net.
+
+* **AC**
+
+  * Select month (YYYY-MM)
+  * Summary recalculates when month changes
+  * Totals reflect base currency normalization (if multi-currency enabled)
+
+### US-E2 Category breakdown
+
+**As a user**, I want to see where my money went by category.
+
+* **AC**
+
+  * Donut/pie chart shows expense split
+  * Clicking a category filters transaction list to that category
+
+### US-E3 Trend chart
+
+**As a user**, I want to see trends over time.
+
+* **AC**
+
+  * Last 6/12 months net trend displayed
+  * Hover tooltips show exact values
+  * Works with few/no transactions (handles empty states)
+
+---
+
+## Epic F — CSV Import/Export
+
+### US-F1 Export CSV
+
+**As a user**, I want to export my transactions to CSV.
+
+* **AC**
+
+  * Export respects current filters
+  * CSV contains headers and ISO dates
+  * Downloads from browser successfully
+
+### US-F2 Import CSV with preview
+
+**As a user**, I want to import a CSV so I can migrate my data.
+
+* **AC**
+
+  * Upload CSV and system displays preview rows
+  * Invalid rows are highlighted with reasons
+  * On confirm, valid rows are imported
+  * Categories/tags auto-create if missing (default ON)
+
+### US-F3 Download CSV template
+
+**As a user**, I want a template CSV so I know the required format.
+
+* **AC**
+
+  * “Download template” provides correct headers and example row
+
+---
+
+## Epic G — Forecasting (Stretch)
+
+### US-G1 Forecast next month net
+
+**As a user**, I want a forecast to estimate next month savings.
+
+* **AC**
+
+  * Uses last N months (configurable; default 6)
+  * Shows forecast number + simple explanation (“based on last 6 months trend”)
+
+---
+
+# 7. Demo Acceptance Checklist (What you should be able to show live)
+
+* Register/login works
+* Add/edit/delete transactions
+* Filtering & pagination works
+* Categories & tags CRUD works
+* Dashboard totals and charts update correctly
+* CSV export works (download)
+* CSV import preview + validation works
+* (Stretch) forecast box + multi-currency normalization
+
+---
+
+If you want, I can also generate:
+
+* A **“Demo Script”** (5–7 minutes) that hits every feature smoothly
+* A **test plan** (API + UI) aligned to these user stories
+* A **backend entity model + minimal API contract** that matches this SRS exactly
+
+
+Awesome — here are **all three**: a **7-minute demo script**, a **test plan (API + UI)** mapped to your user stories, and a **backend entity model + minimal API contract** that matches the SRS.
+
+---
+
+## 1) Demo Script (5–7 minutes, smooth + impressive)
+
+### Prep (before demo)
+
+* Have 1 user account: `demo@finance.app`
+* Have 1 budget space: “Personal 2026” (CAD base)
+* Have a **small dataset** ready as CSV (10–30 rows) + an “invalid rows” CSV for validation demo
+* Open app on **Dashboard** page
+
+### 0:00–0:45 — Hook: show business value fast
+
+1. **Dashboard**: “Here’s the monthly summary for January 2026”
+
+   * Point to **Income / Expense / Net**
+2. Show **Charts**:
+
+   * Donut: spending by category
+   * Line: net trend (last 6/12 months)
+3. Mention: “All analytics are server aggregated (SQL), not computed in browser.”
+
+### 0:45–2:15 — Core CRUD (transactions) + reactive dashboard
+
+1. Go to **Transactions**
+2. Click **Add Transaction**
+
+   * Type: Expense
+   * Amount: 18.50
+   * Category: Food
+   * Tags: `coffee`, `work`
+   * Merchant: “Cafe”
+   * Date: today
+3. Save → show it appears in list
+4. Switch back to **Dashboard**
+
+   * Show totals and charts updated automatically
+
+### 2:15–3:30 — Filtering + drill-down interaction
+
+1. Back to Dashboard donut chart:
+
+   * Click **Food** slice → it navigates/filters Transactions view
+2. Show filters:
+
+   * Date range (this month)
+   * Tag filter (`work`)
+   * Keyword search (`Cafe`)
+3. Show **sort** (amount desc) + **pagination** (page size 25)
+
+### 3:30–4:15 — Categories + tags management
+
+1. Open **Categories**
+
+   * Create “Subscriptions”
+   * Rename “Transport” → “Transit”
+2. Open **Tags**
+
+   * Create “health”
+   * Show usage counts
+
+### 4:15–5:45 — CSV export + import preview + validation (big wow)
+
+1. Go to **Export**
+
+   * Export current filters → download CSV
+2. Go to **Import**
+
+   * Upload “invalid.csv”
+   * Show preview with highlighted invalid rows + reasons (bad date, missing amount, unknown type)
+   * Cancel
+3. Upload “valid.csv”
+
+   * Preview shows new categories/tags to be auto-created
+   * Confirm import
+4. Return to Dashboard → show trends changed
+
+### 5:45–6:30 — Stretch features (quick flex)
+
+1. Multi-currency: add one transaction in USD with stored `exchangeRateToBase`
+2. Forecast widget:
+
+   * “Forecast next month net: $X (based on last 6 months trend)”
+
+### 6:30–7:00 — Wrap up architecture + deploy mention
+
+* “Vue 3 Composition API + Pinia, ASP.NET Core Web API, EF Core + PostgreSQL.”
+* “Azure deployment: App Service + managed Postgres + CI/CD.”
+
+---
+
+## 2) Test Plan (Demo-ready, mapped to user stories)
+
+### 2.1 Test Strategy
+
+**Layers**
+
+* Backend: Unit tests (services), Integration tests (API + DB), Contract tests (DTO validation)
+* Frontend: Component tests (filters, forms), E2E tests (Playwright/Cypress)
+
+**Environments**
+
+* Local: Postgres via Docker
+* CI: ephemeral Postgres container, apply migrations
+
+**Test Data**
+
+* Seed with:
+
+  * 2 budget spaces
+  * 30 transactions across 3 months
+  * 6 categories, 10 tags
+  * one shared member user (stretch)
+
+---
+
+### 2.2 Backend API Tests (Integration)
+
+#### Auth (US-A1/A2)
+
+* **T-AUTH-01 Register succeeds**
+
+  * POST `/auth/register` valid email/password → 201 + token
+* **T-AUTH-02 Register duplicate fails**
+
+  * same email → 409
+* **T-AUTH-03 Login succeeds**
+
+  * valid creds → 200 + token
+* **T-AUTH-04 Login fails**
+
+  * wrong password → 401
+
+#### Budget Spaces (US-B1/B2/B3)
+
+* **T-BS-01 Create budget space**
+
+  * POST `/budgetSpaces` → returns id + baseCurrency
+* **T-BS-02 List budget spaces**
+
+  * GET `/budgetSpaces` shows created
+* **T-BS-03 RBAC enforcement**
+
+  * user without membership GET `/transactions?budgetSpaceId=...` → 403
+* **T-BS-04 Invite flow (stretch)**
+
+  * Owner creates invite → invited user can accept → membership created
+
+#### Transactions CRUD + list (US-C1..C6)
+
+* **T-TX-01 Create transaction**
+
+  * required fields only → 201
+* **T-TX-02 Validation**
+
+  * amount <= 0 → 400
+  * invalid date → 400
+* **T-TX-03 Update transaction**
+
+  * PUT changes category/tags → 200, persists
+* **T-TX-04 Delete transaction**
+
+  * DELETE → 204, excluded from lists/analytics
+* **T-TX-05 Pagination**
+
+  * page=1,size=10 returns 10 + totalCount
+* **T-TX-06 Filters**
+
+  * date range + type + category + tag(s) + keyword
+* **T-TX-07 Sorting**
+
+  * sort=amount desc returns correct order
+* **T-TX-08 Bulk update**
+
+  * bulk add tag, bulk set category works
+
+#### Categories + Tags (US-D1/D2)
+
+* **T-CAT-01 Create/rename category uniqueness**
+
+  * duplicate name → 409
+* **T-CAT-02 Delete category behavior**
+
+  * if configured “nullify”: deleting sets categoryId to null
+* **T-TAG-01 Tag usage counts**
+
+  * GET `/tags` returns usageCount correct
+* **T-TAG-02 Rename tag cascades**
+
+  * linked transactions reflect rename
+
+#### Analytics (US-E1..E3)
+
+* **T-AN-01 Monthly summary**
+
+  * totals match DB truth
+* **T-AN-02 Category breakdown**
+
+  * sums by category match
+* **T-AN-03 Trends**
+
+  * last N months returns correct sequence
+* **T-AN-04 Currency normalization**
+
+  * USD w exchangeRate included properly
+
+#### CSV (US-F1..F3)
+
+* **T-CSV-01 Export respects filters**
+
+  * apply filter then export → file includes only expected rows
+* **T-CSV-02 Import preview validation**
+
+  * invalid rows detected with reason codes
+* **T-CSV-03 Import confirm**
+
+  * inserts rows; creates categories/tags if enabled
+* **T-CSV-04 Import transactionality**
+
+  * if “all-or-nothing”, ensure no partial insert on fatal error
+  * if “partial”, ensure returns insertedCount + failedRows
+
+#### Forecasting (US-G1)
+
+* **T-FC-01 Forecast returns**
+
+  * computed value returns for months>=2
+* **T-FC-02 Insufficient data**
+
+  * returns “not enough data” indicator
+
+---
+
+### 2.3 Frontend Tests
+
+#### Component tests
+
+* Transaction form validation (required fields, amount > 0)
+* Filters composable:
+
+  * changing filter triggers API call
+  * reset restores defaults
+* Chart click interaction triggers filter state update
+
+#### E2E critical flows (Playwright/Cypress)
+
+1. Register → Create budget space → Add transaction → Dashboard updates
+2. Filter by tag + search keyword returns expected rows
+3. CSV import preview shows invalid rows and blocks confirm
+4. CSV import valid file populates list and dashboard
+
+---
+
+## 3) Backend Entity Model + Minimal API Contract
+
+### 3.1 Entity Model (C# / EF Core conceptual)
+
+> This is a **clean, demo-ready schema** that supports everything in the SRS.
+
+#### User
+
+* `Id (Guid)`
+* `Email (string, unique)`
+* `PasswordHash (string)`
+* `DisplayName (string?)`
+* `DefaultCurrency (string, ISO)`
+* `CreatedAt`
+
+#### BudgetSpace
+
+* `Id (Guid)`
+* `OwnerUserId (Guid)`
+* `Name (string)`
+* `BaseCurrency (string)`
+* `CreatedAt`
+
+#### BudgetSpaceMember
+
+* `BudgetSpaceId (Guid)`
+* `UserId (Guid)`
+* `Role (enum: Owner, Editor, Viewer)`
+* composite unique (BudgetSpaceId, UserId)
+
+#### Category
+
+* `Id (Guid)`
+* `BudgetSpaceId (Guid)`
+* `Name (string)`
+* `AppliesTo (enum: Income, Expense, Both)` (optional)
+* unique (BudgetSpaceId, Name)
+
+#### Tag
+
+* `Id (Guid)`
+* `BudgetSpaceId (Guid)`
+* `Name (string)`
+* unique (BudgetSpaceId, Name)
+
+#### Transaction
+
+* `Id (Guid)`
+* `BudgetSpaceId (Guid)`
+* `Type (enum: Income, Expense)`
+* `Amount (decimal(18,2))`
+* `Currency (string)` (ISO)
+* `ExchangeRateToBase (decimal(18,6))` (1.0 if same currency)
+* `AmountInBase (computed or stored)` *(recommend store for fast analytics)*
+* `Date (date)`
+* `CategoryId (Guid?)`
+* `Merchant (string?)`
+* `Note (string?)`
+* `IsDeleted (bool)`
+* `CreatedAt`, `UpdatedAt`
+
+#### TransactionTag (join)
+
+* `TransactionId (Guid)`
+* `TagId (Guid)`
+* composite unique (TransactionId, TagId)
+
+#### Invite (stretch)
+
+* `Id (Guid)`
+* `BudgetSpaceId`
+* `InvitedEmail`
+* `Role`
+* `Status (Pending/Accepted/Expired)`
+* `CreatedAt`, `ExpiresAt`
+
+**Indexes (important for demo performance)**
+
+* Transactions: `(BudgetSpaceId, Date desc)`, `(BudgetSpaceId, Type)`, `(BudgetSpaceId, CategoryId)`, `(BudgetSpaceId, IsDeleted)`
+* TransactionTag: `(TagId)` and `(TransactionId)`
+* Category/Tag uniqueness per BudgetSpace
+
+---
+
+### 3.2 Minimal API Contract (REST)
+
+#### Auth
+
+**POST** `/auth/register`
+
+```json
+{ "email": "a@b.com", "password": "string", "displayName": "Z" }
+```
+
+**201**
+
+```json
+{ "accessToken": "jwt", "user": { "id": "...", "email": "...", "displayName": "Z", "defaultCurrency": "CAD" } }
+```
+
+**POST** `/auth/login`
+
+```json
+{ "email": "a@b.com", "password": "string" }
+```
+
+**200** same shape as register.
+
+---
+
+#### Budget Spaces
+
+**GET** `/budgetSpaces`
+**200**
+
+```json
+[{ "id":"...", "name":"Personal 2026", "baseCurrency":"CAD", "role":"Owner" }]
+```
+
+**POST** `/budgetSpaces`
+
+```json
+{ "name":"Personal 2026", "baseCurrency":"CAD" }
+```
+
+**201** returns created.
+
+**POST** `/budgetSpaces/{id}/invites` *(stretch)*
+
+```json
+{ "email":"friend@x.com", "role":"Viewer" }
+```
+
+**POST** `/invites/{inviteId}/accept` *(stretch)*
+
+---
+
+#### Categories
+
+**GET** `/categories?budgetSpaceId=...`
+**POST** `/categories`
+
+```json
+{ "budgetSpaceId":"...", "name":"Food", "appliesTo":"Expense" }
+```
+
+**PUT** `/categories/{id}`
+**DELETE** `/categories/{id}`
+
+---
+
+#### Tags
+
+**GET** `/tags?budgetSpaceId=...` (include usage counts)
+**200**
+
+```json
+[{ "id":"...", "name":"work", "usageCount": 12 }]
+```
+
+**POST** `/tags`
+**PUT** `/tags/{id}`
+**DELETE** `/tags/{id}`
+
+---
+
+#### Transactions
+
+**GET** `/transactions`
+Query params:
+
+* `budgetSpaceId` (required)
+* `page`, `pageSize`
+* `from`, `to` (date)
+* `type` (Income/Expense)
+* `categoryId`
+* `tagIds` (repeatable or comma list)
+* `q` (search merchant/note)
+* `minAmount`, `maxAmount`
+* `sortBy` (date|amount|updatedAt), `sortDir` (asc|desc)
+
+**200**
+
+```json
+{
+  "items": [
+    {
+      "id":"...",
+      "type":"Expense",
+      "amount":18.50,
+      "currency":"CAD",
+      "exchangeRateToBase":1.0,
+      "amountInBase":18.50,
+      "date":"2026-01-06",
+      "category": { "id":"...", "name":"Food" },
+      "tags":[{ "id":"...", "name":"work" }],
+      "merchant":"Cafe",
+      "note":"Latte"
+    }
+  ],
+  "page":1,
+  "pageSize":25,
+  "totalCount": 143
+}
+```
+
+**POST** `/transactions`
+
+```json
+{
+  "budgetSpaceId":"...",
+  "type":"Expense",
+  "amount":18.50,
+  "currency":"CAD",
+  "exchangeRateToBase":1.0,
+  "date":"2026-01-06",
+  "categoryId":"...",
+  "tagIds":["...","..."],
+  "merchant":"Cafe",
+  "note":"Latte"
+}
+```
+
+**PUT** `/transactions/{id}` same body (without budgetSpaceId)
+**DELETE** `/transactions/{id}`
+
+**POST** `/transactions/bulk`
+
+```json
+{
+  "budgetSpaceId":"...",
+  "transactionIds":["...","..."],
+  "setCategoryId":"...",
+  "addTagIds":["..."],
+  "removeTagIds":[]
+}
+```
+
+---
+
+#### Analytics
+
+**GET** `/analytics/monthlySummary?budgetSpaceId=...&month=2026-01`
+**200**
+
+```json
+{
+  "month":"2026-01",
+  "baseCurrency":"CAD",
+  "incomeTotal": 4200.00,
+  "expenseTotal": 2150.25,
+  "net": 2049.75
+}
+```
+
+**GET** `/analytics/categoryBreakdown?budgetSpaceId=...&month=2026-01&type=Expense`
+**200**
+
+```json
+{
+  "month":"2026-01",
+  "items":[{ "categoryId":"...", "categoryName":"Food", "total": 320.10 }]
+}
+```
+
+**GET** `/analytics/trends?budgetSpaceId=...&months=12`
+**200**
+
+```json
+{
+  "baseCurrency":"CAD",
+  "points":[{ "month":"2025-10", "income":4000, "expense":2100, "net":1900 }]
+}
+```
+
+**GET** `/analytics/forecast?budgetSpaceId=...&months=6`
+**200**
+
+```json
+{ "method":"linear", "monthsUsed":6, "forecastMonth":"2026-02", "forecastNet": 1980.50, "baseCurrency":"CAD" }
+```
+
+---
+
+#### CSV
+
+**GET** `/csv/template` → downloads template
+**GET** `/csv/export?budgetSpaceId=...&from=...&to=...` → downloads CSV
+
+**POST** `/csv/import/preview` (multipart file upload)
+**200**
+
+```json
+{
+  "totalRows": 25,
+  "validRows": 22,
+  "invalidRows": [
+    { "rowNumber": 7, "errors": ["INVALID_DATE"], "raw": { "date":"13/99/2026", "amount":"10" } }
+  ],
+  "willCreateCategories":["Subscriptions"],
+  "willCreateTags":["gym"]
+}
+```
+
+**POST** `/csv/import/confirm`
+
+```json
+{ "budgetSpaceId":"...", "uploadToken":"previewToken", "autoCreateCategories":true, "autoCreateTags":true }
+```
+
+**200**
+
+```json
+{ "inserted": 22, "failed": 3 }
+```

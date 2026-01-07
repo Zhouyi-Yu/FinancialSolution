@@ -1,0 +1,12 @@
+@import "tailwindcss";
+
+@theme {
+    --color-finance-bg: #0B0E1B;
+    --color-finance-card: #161B30;
+    --color-finance-text: #FFFFFF;
+    --color-finance-muted: #8A94A6;
+    --color-finance-cyan: #00D1FF;
+    --color-finance-yellow: #FFD600;
+    --color-finance-green: #00EDA0;
+    --color-finance-red: #F9575E;
+}
