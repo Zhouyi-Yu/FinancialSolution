@@ -1,5 +1,7 @@
 # Personal Finance Dashboard 💰
 
+[**Changelog**](CHANGELOG.md)
+
 A full-stack finance tracking application built with **Vue 3** and **ASP.NET Core**.
 
 ## Tech Stack
@@ -44,6 +46,15 @@ npm install
 npm run dev
 ```
 Open `http://localhost:5173` in your browser.
+  
+## ☁️ Cloud Architecture (AWS Target)
+
+Designed for high-availability deployment on AWS to demonstrate cloud-native aptitude:
+- **Compute:** AWS App Runner or ECS (Fargate) for the containerized .NET API.
+- **Frontend:** AWS S3 + CloudFront for static Vue.js hosting.
+- **Database:** AWS RDS (PostgreSQL 15) for managed data persistence.
+- **Caching:** AWS ElastiCache (Redis) for high-performance analytics caching.
+- **CI/CD:** GitHub Actions (Current) pushing Docker images to **AWS ECR**.
 
 ## Features implemented
 

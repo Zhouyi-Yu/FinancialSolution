@@ -26,3 +26,7 @@ jobs:
       
     - name: Test
       run: dotnet test ./backend/FinancialSolution.sln --no-build --verbosity normal
+
+    - name: Build Docker Image (AWS Ready)
+      run: |
+        docker build -t finance-api:latest ./backend
