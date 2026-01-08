@@ -37,13 +37,15 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         };
     });
 
-// CORS
+// Application Security: CORS
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowFrontend",
-        policy => policy.WithOrigins("http://localhost:5173") // Vite default port
-                        .AllowAnyMethod()
-                        .AllowAnyHeader());
+    options.AddPolicy("FrontendPolicy", policy =>
+    {
+        policy.WithOrigins("http://localhost:5173")
+              .AllowAnyHeader()
+              .AllowAnyMethod();
+    });
 });
 
 var app = builder.Build();
@@ -57,7 +59,8 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection(); // Optional for local dev without certs, might disable if annoying
 
-app.UseCors("AllowFrontend");
+app.UseCors("FrontendPolicy"); // Security
+app.MapHealthChecks("/health"); // Monitoring
 
 app.UseAuthentication();
 app.UseAuthorization();
