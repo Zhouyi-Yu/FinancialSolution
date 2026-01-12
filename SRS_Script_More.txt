@@ -1,7 +1,3 @@
-Below is a **demo-ready SRS** (Software Requirements Specification) plus a complete set of **user stories with acceptance criteria** for **Personal Finance & Budget Tracking Dashboard** (Vue 3 + ASP.NET Core + PostgreSQL).
-
----
-
 # Software Requirements Specification (SRS)
 
 ## 1. Introduction

@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.2.0] - 2026-01-11
+
+### Added
+- **Power BI Implementation**: Added full Star Schema design and DAX measures for financial analytics.
+- **Data Lake Architecture**: Documented MongoDB landing zone and ETL strategy for enterprise data handling.
+- **Python Analytics Simulation**: Added `power_bi_model.py` to verify data modeling and analytics logic in non-Windows environments.
+- **ETL Pipelines**: Implemented structured data acquisition and cleansing logic.
+
 ## [1.1.0] - 2026-01-07
 
 ### Added

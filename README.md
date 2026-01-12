@@ -8,7 +8,8 @@ A full-stack finance tracking application built with **Vue 3** and **ASP.NET Cor
 
 - **Frontend:** Vue 3 (Composition API), Pinia, Vue Router, TailwindCSS, Vite
 - **Backend:** ASP.NET Core 8.0/10.0 Web API, Entity Framework Core, JWT Auth
-- **Database:** PostgreSQL (via Docker)
+- **Database:** PostgreSQL (via Docker), MongoDB (Data Lake Landing Zone)
+- **Data & BI:** Power BI (DAX, Star Schema), Python (ETL & Analytics Simulation)
 
 ## Prerequisites
 
@@ -55,6 +56,7 @@ Designed for high-availability deployment on AWS to demonstrate cloud-native apt
 - **Database:** AWS RDS (PostgreSQL 15) for managed data persistence.
 - **Caching:** AWS ElastiCache (Redis) for high-performance analytics caching.
 - **CI/CD:** GitHub Actions (Current) pushing Docker images to **AWS ECR**.
+- **Data Lake:** S3 (Landing Zone) + AWS Glue (Crawl/Transform) for enterprise-scale analytics.
 
 ## Features implemented
 
@@ -62,7 +64,31 @@ Designed for high-availability deployment on AWS to demonstrate cloud-native apt
 - **Budget Spaces:** Isolate your finances.
 - **Transactions:** Create, edit, delete, and filter income/expenses.
 - **Analytics:** Monthly summaries and category breakdowns.
+- **Power BI Integration:** Professional data modeling with Star Schema and DAX measures.
+- **ETL Pipelines:** Robust data ingestion and cleansing logic for diverse data sources.
 - **Tags & Categories:** Manage your metadata.
+
+## 📈 Power BI & Data Architecture
+
+This project includes a professional-grade Business Intelligence implementation located in the `power_bi/` directory.
+
+### 1. Data Modeling (Star Schema)
+Designed a high-performance **Star Schema** to enable complex time-intelligence reporting:
+- **Fact_Transactions**: Core metrics (Amount, DateKey).
+- **Dim_Date**: Dynamic date dimension for MoM/YoY analysis.
+- **Dim_Category / Dim_Merchant**: Normalized metadata for granular filtering.
+
+### 2. Advanced Analytics (DAX)
+Implemented custom **DAX Measures** for strategic financial insights:
+- **MoM Spend Growth %**: Tracking monthly spending velocity.
+- **Budget Utilization %**: Real-time budget vs. actuals monitoring.
+- **Star Schema Performance**: Optimized for schema-on-read performance.
+
+### 3. ETL & Data Cleansing
+The system implements a robust **ETL pipeline** (simulated in `power_bi_model.py`) that handles:
+- **Acquisition**: Ingesting raw financial data from landing zones.
+- **Cleansing**: Removing duplicates and normalizing currency types.
+- **Loading**: Populating the Star Schema for downstream reporting.
 
 ## Troubleshooting
 
