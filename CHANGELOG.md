@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.0] - 2026-01-13
+
+### Added
+- **Transaction Management**: Users can now manually Add, Edit, and Delete transactions via a new modal interface.
+- **Interactive Trends**: "Cash Flow" and "Expense" charts now support time-range filtering (1D, 1W, 1M, 3M, 6M, Max) with automatic data granularity adjustment (Hourly/Daily/Monthly).
+- **PDF Upload Feature**: Implemented bank statement parsing with duplicate detection and preview confirmation.
+- **Debug Console**: Added an in-app debug overlay for real-time frontend logging.
+
+### Fixed
+- **Chart Reliability**: Resolved backend 500 errors caused by Npgsql/EF Core timezone mismatches (`DateTimeKind.Utc`).
+- **Authentication**: Fixed session persistence issue causing 401 errors on page refresh; added auto-redirect to login on session expiry.
+- **UI Glitches**: Removed persistent mock data sections ("Department Spend") and fixed Vue template malformation bugs.
+
 ## [1.2.0] - 2026-01-11
 
 ### Added
