@@ -3,34 +3,135 @@ import { useAuthStore } from '../../stores/auth'
 import { useRouter } from 'vue-router'
 import DashboardCard from '../../components/DashboardCard.vue'
 import LineChart from '../../components/LineChart.vue'
-import { ref, onMounted } from 'vue'
+import PdfImportDialog from '../../components/PdfImportDialog.vue'
+import TransactionFormDialog from '../../components/TransactionFormDialog.vue'
+import { ref, onMounted, watch } from 'vue'
 import axios from 'axios'
 
 const auth = useAuthStore()
 const router = useRouter()
+const showImportDialog = ref(false)
+const showTransactionDialog = ref(false)
+const transactionDialogMode = ref<'add' | 'edit'>('add')
+const editingTransaction = ref<any>(null)
+const currentBudgetSpaceId = ref<string>('')
 
 const monthlyData = ref({ income: 0, expense: 0, net: 0 })
-// Mock data for charts until real API aggregation is more robust
-const chartLabels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun']
-const burnRateData = [12000, 15000, 11000, 18000, 16000, 21500]
-const cashData = [50000, 48000, 52000, 55000, 49000, 60000]
+const recentTransactions = ref<any[]>([])
+const trendLabels = ref<string[]>([])
+const incomeTrend = ref<number[]>([])
+const expenseTrend = ref<number[]>([])
+const isLoading = ref(true)
+
+const timeRanges = ['1D', '1W', '1M', '3M', '6M', 'Max']
+const selectedTimeRange = ref('6M')
+
+watch(selectedTimeRange, async () => {
+  if (currentBudgetSpaceId.value) {
+    await fetchTrends()
+  }
+})
+
+async function fetchTrends() {
+   try {
+      const trendsResp = await axios.get(`http://localhost:5194/api/Analytics/trends?budgetSpaceId=${currentBudgetSpaceId.value}&range=${selectedTimeRange.value}`)
+      if (trendsResp.data.points) {
+        trendLabels.value = trendsResp.data.points.map((p: any) => p.month)
+        incomeTrend.value = trendsResp.data.points.map((p: any) => p.income)
+        expenseTrend.value = trendsResp.data.points.map((p: any) => p.expense)
+      }
+   } catch (e) {
+     console.error("Failed to fetch trends", e)
+   }
+}
 
 onMounted(async () => {
-  // Fetch real summary for current month
+  isLoading.value = true
+  
   try {
     const spaceIdResp = await axios.get('http://localhost:5194/api/BudgetSpaces')
     if(spaceIdResp.data.length > 0) {
       const spaceId = spaceIdResp.data[0].id
+      currentBudgetSpaceId.value = spaceId
+      
       const now = new Date()
       const monthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
       
-      const summaryResp = await axios.get(`http://localhost:5194/api/Analytics/monthlySummary?budgetSpaceId=${spaceId}&month=${monthStr}`)
+      // Parallel fetch
+      const [summaryResp, transResp] = await Promise.all([
+        axios.get(`http://localhost:5194/api/Analytics/monthlySummary?budgetSpaceId=${spaceId}&month=${monthStr}`),
+        axios.get(`http://localhost:5194/api/transactions?budgetSpaceId=${spaceId}&pageSize=5`)
+      ])
+
       monthlyData.value = summaryResp.data
+      recentTransactions.value = transResp.data.items || []
+      
+      // Fetch trends separately to use the shared function
+      await fetchTrends()
     }
   } catch (e) {
     console.error("Failed to load dashboard data", e)
+  } finally {
+    isLoading.value = false
   }
 })
+
+async function refreshDashboard() {
+  isLoading.value = true
+  try {
+    const now = new Date()
+    const monthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+    
+    // Parallel requests
+    const [summaryResp, transResp] = await Promise.all([
+      axios.get(`http://localhost:5194/api/Analytics/monthlySummary?budgetSpaceId=${currentBudgetSpaceId.value}&month=${monthStr}`),
+      axios.get(`http://localhost:5194/api/transactions?budgetSpaceId=${currentBudgetSpaceId.value}&pageSize=5`)
+    ])
+
+    monthlyData.value = summaryResp.data
+    recentTransactions.value = transResp.data.items || []
+    
+    await fetchTrends()
+  } finally {
+    isLoading.value = false
+  }
+}
+
+function handleAddTransaction() {
+  transactionDialogMode.value = 'add'
+  editingTransaction.value = null
+  showTransactionDialog.value = true
+}
+
+function handleEditTransaction(transaction: any) {
+  transactionDialogMode.value = 'edit'
+  editingTransaction.value = transaction
+  showTransactionDialog.value = true
+}
+
+async function handleDeleteTransaction(transactionId: string) {
+  if (!confirm('Are you sure you want to delete this transaction? This cannot be undone.')) {
+    return
+  }
+
+  try {
+    await axios.delete(`http://localhost:5194/api/transactions/${transactionId}?budgetSpaceId=${currentBudgetSpaceId.value}`)
+    await refreshDashboard()
+  } catch (err) {
+    alert('Failed to delete transaction')
+  }
+}
+
+function onTransactionSaved() {
+  showTransactionDialog.value = false
+  refreshDashboard()
+}
+
+function onImportComplete(count: number) {
+  alert(`Successfully imported ${count} transactions!`)
+  showImportDialog.value = false
+  // Optionally reload dashboard data here
+}
 
 function logout() {
   auth.logout()
@@ -48,6 +149,24 @@ function logout() {
       </div>
       <div class="flex items-center space-x-4">
         <span class="text-finance-text text-sm font-medium">Hello, {{ auth.user?.displayName || 'User' }}</span>
+        <button 
+          @click="handleAddTransaction" 
+          class="px-5 py-2.5 bg-finance-cyan hover:bg-white text-black font-bold rounded-xl transition-all duration-200 text-sm flex items-center space-x-2"
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+          </svg>
+          <span>Add Transaction</span>
+        </button>
+        <button 
+          @click="showImportDialog = true" 
+          class="px-5 py-2.5 bg-finance-green hover:bg-white text-black font-bold rounded-xl transition-all duration-200 text-sm flex items-center space-x-2"
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+          </svg>
+          <span>Import Statement</span>
+        </button>
         <button @click="logout" class="px-4 py-2 bg-finance-card border border-gray-700 text-finance-text rounded hover:bg-gray-800 transition-colors text-sm">
           Logout
         </button>
@@ -57,23 +176,18 @@ function logout() {
     <!-- Grid Layout -->
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
       <!-- KPI Cards -->
-      <DashboardCard title="Current Cash Balance">
+      <DashboardCard title="Monthly Income">
         <div class="flex items-baseline space-x-2">
-          <span class="text-4xl font-bold text-finance-text">$64,200</span>
-          <span class="text-finance-green text-sm font-medium">↑ 12%</span>
+          <span class="text-4xl font-bold text-finance-green">${{ monthlyData.income.toLocaleString() }}</span>
         </div>
-        <div class="mt-4 h-1 bg-gray-800 rounded overflow-hidden">
-          <div class="h-full bg-finance-cyan" style="width: 75%"></div>
-        </div>
-        <p class="text-finance-muted text-xs mt-2">Target: $85,000</p>
+        <p class="text-finance-muted text-xs mt-4">Total received this month</p>
       </DashboardCard>
 
-      <DashboardCard title="Monthly Burn Rate">
+      <DashboardCard title="Monthly Expenses">
         <div class="flex items-baseline space-x-2">
-           <span class="text-4xl font-bold text-finance-text">${{ monthlyData.expense.toLocaleString() }}</span>
-           <span class="text-finance-red text-sm font-medium">↑ 5%</span>
+           <span class="text-4xl font-bold text-finance-red">${{ monthlyData.expense.toLocaleString() }}</span>
         </div>
-        <p class="text-finance-muted text-xs mt-4">vs. previous 30 days</p>
+        <p class="text-finance-muted text-xs mt-4">Total spent this month</p>
       </DashboardCard>
 
       <DashboardCard title="Net Burn">
@@ -85,30 +199,76 @@ function logout() {
          <p class="text-finance-muted text-xs mt-4">Income - Expenses</p>
       </DashboardCard>
 
-      <DashboardCard title="Runway">
+      <DashboardCard title="Total Transactions">
         <div class="flex items-baseline space-x-2">
-           <span class="text-4xl font-bold text-finance-text">14.2</span>
-           <span class="text-finance-muted text-lg">months</span>
+           <span class="text-4xl font-bold text-finance-cyan">{{ recentTransactions.length }}</span>
         </div>
-        <p class="text-finance-muted text-xs mt-4">Based on current burn rate</p>
+        <p class="text-finance-muted text-xs mt-4">Tracked this period</p>
       </DashboardCard>
     </div>
 
-    <!-- Charts Row -->
+    <!-- Charts -->
+    <div class="flex items-center justify-between mb-4">
+        <h2 class="text-xl font-bold text-white">Financial Trends</h2>
+        <div class="bg-finance-card rounded-lg p-1 flex space-x-1 border border-white/5">
+          <button 
+            v-for="range in timeRanges" 
+            :key="range"
+            @click="selectedTimeRange = range"
+            class="px-3 py-1 text-xs font-bold rounded-md transition-all"
+            :class="selectedTimeRange === range ? 'bg-finance-cyan text-black shadow-lg' : 'text-finance-muted hover:text-white hover:bg-white/5'"
+          >
+            {{ range }}
+          </button>
+        </div>
+    </div>
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-      <DashboardCard title="Cash Flow Forecast">
-        <LineChart :labels="chartLabels" :data="cashData" color="#00D1FF" />
+      <DashboardCard title="Cash Flow Trend">
+        <div v-if="isLoading" class="h-64 flex items-center justify-center">
+          <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-finance-cyan"></div>
+        </div>
+        <LineChart 
+          v-else
+          :data="incomeTrend"
+          :labels="trendLabels" 
+          color="#10B981"
+        />
       </DashboardCard>
       
-      <DashboardCard title="Expense Trend (Burn)">
-        <LineChart :labels="chartLabels" :data="burnRateData" color="#F9575E" />
+      <DashboardCard title="Expense Trend">
+        <div v-if="isLoading" class="h-64 flex items-center justify-center">
+          <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-finance-cyan"></div>
+        </div>
+        <LineChart 
+          v-else
+          :data="expenseTrend"
+          :labels="trendLabels" 
+          color="#EF4444"
+        />
       </DashboardCard>
     </div>
 
-    <!-- Tables Row -->
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      <DashboardCard title="Recent Transactions" class="lg:col-span-2">
-        <div class="overflow-x-auto">
+    <!-- Recent Transactions (Full Width) -->
+    <div class="mb-6">
+      <DashboardCard title="Recent Transactions">
+        <div v-if="isLoading" class="text-center text-finance-muted py-12">
+          <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-finance-cyan mx-auto"></div>
+          <p class="mt-4">Loading transactions...</p>
+        </div>
+        <div v-else-if="recentTransactions.length === 0" class="text-center text-finance-muted py-12">
+          <svg class="w-16 h-16 mx-auto mb-4 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+          </svg>
+          <p class="text-lg font-semibold">No transactions yet</p>
+          <p class="text-sm mt-2">Import your bank statement or add transactions manually</p>
+          <button 
+            @click="showImportDialog = true"
+            class="mt-6 px-6 py-3 bg-finance-green hover:bg-white text-black font-bold rounded-xl transition-all inline-block"
+          >
+            Import Your First Statement
+          </button>
+        </div>
+        <div v-else class="overflow-x-auto">
           <table class="w-full text-sm text-left">
             <thead>
               <tr class="text-finance-muted border-b border-gray-800">
@@ -116,63 +276,69 @@ function logout() {
                 <th class="pb-3 font-normal">Date</th>
                 <th class="pb-3 font-normal">Category</th>
                 <th class="pb-3 font-normal text-right">Amount</th>
+                <th class="pb-3 font-normal text-center">Actions</th>
               </tr>
             </thead>
             <tbody class="text-finance-text">
-              <tr class="border-b border-gray-800/50 last:border-0">
-                <td class="py-3">AWS Web Services</td>
-                <td class="py-3 text-finance-muted">Jan 05</td>
-                <td class="py-3"><span class="px-2 py-1 bg-blue-900/30 text-blue-400 rounded text-xs">Infrastructure</span></td>
-                <td class="py-3 text-right">-$1,204.50</td>
-              </tr>
-              <tr class="border-b border-gray-800/50 last:border-0">
-                <td class="py-3">Stripe Payout</td>
-                <td class="py-3 text-finance-muted">Jan 04</td>
-                <td class="py-3"><span class="px-2 py-1 bg-green-900/30 text-green-400 rounded text-xs">Revenue</span></td>
-                <td class="py-3 text-right text-finance-green">+$4,500.00</td>
-              </tr>
-              <tr class="border-b border-gray-800/50 last:border-0">
-                <td class="py-3">WeWork Rent</td>
-                <td class="py-3 text-finance-muted">Jan 01</td>
-                <td class="py-3"><span class="px-2 py-1 bg-orange-900/30 text-orange-400 rounded text-xs">Office</span></td>
-                <td class="py-3 text-right">-$3,500.00</td>
+              <tr v-for="tx in recentTransactions" :key="tx.id" class="border-b border-gray-800/50 last:border-0">
+                <td class="py-3">{{ tx.merchant || 'Unknown' }}</td>
+                <td class="py-3 text-finance-muted">{{ new Date(tx.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) }}</td>
+                <td class="py-3">
+                  <span v-if="tx.categoryName" class="px-2 py-1 bg-blue-900/30 text-blue-400 rounded text-xs">
+                    {{ tx.categoryName }}
+                  </span>
+                  <span v-else class="text-finance-muted text-xs">Uncategorized</span>
+                </td>
+                <td class="py-3 text-right" :class="tx.type === 'Income' ? 'text-finance-green' : 'text-finance-text'">
+                  {{ tx.type === 'Income' ? '+' : '-' }}${{ tx.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}
+                </td>
+                <td class="py-3">
+                  <div class="flex items-center justify-center space-x-2">
+                    <button 
+                      @click="handleEditTransaction(tx)"
+                      class="p-1.5 text-finance-cyan hover:text-white hover:bg-finance-cyan/10 rounded transition-colors"
+                      title="Edit transaction"
+                    >
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                      </svg>
+                    </button>
+                    <button 
+                      @click="handleDeleteTransaction(tx.id)"
+                      class="p-1.5 text-finance-red hover:text-white hover:bg-finance-red/10 rounded transition-colors"
+                      title="Delete transaction"
+                    >
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                    </button>
+                  </div>
+                </td>
               </tr>
             </tbody>
           </table>
         </div>
       </DashboardCard>
-      
-      <DashboardCard title="Department Spend">
-        <div class="space-y-4">
-          <div>
-            <div class="flex justify-between text-sm mb-1">
-              <span>Engineering</span>
-              <span class="text-finance-text">$12,400</span>
-            </div>
-            <div class="h-2 bg-gray-800 rounded overflow-hidden">
-               <div class="h-full bg-finance-cyan" style="width: 65%"></div>
-            </div>
-          </div>
-          <div>
-            <div class="flex justify-between text-sm mb-1">
-              <span>Marketing</span>
-              <span class="text-finance-text">$8,200</span>
-            </div>
-            <div class="h-2 bg-gray-800 rounded overflow-hidden">
-               <div class="h-full bg-finance-yellow" style="width: 45%"></div>
-            </div>
-          </div>
-          <div>
-             <div class="flex justify-between text-sm mb-1">
-              <span>Operations</span>
-              <span class="text-finance-text">$4,100</span>
-            </div>
-            <div class="h-2 bg-gray-800 rounded overflow-hidden">
-               <div class="h-full bg-finance-green" style="width: 25%"></div>
-            </div>
-          </div>
-        </div>
-      </DashboardCard>
     </div>
+
+
+
+    <!-- PDF Import Dialog -->
+    <PdfImportDialog 
+      v-if="showImportDialog"
+      :budget-space-id="currentBudgetSpaceId"
+      @imported="onImportComplete"
+      @close="showImportDialog = false"
+    />
+
+    <!-- Transaction Form Dialog -->
+    <TransactionFormDialog
+      v-if="showTransactionDialog"
+      :budget-space-id="currentBudgetSpaceId"
+      :mode="transactionDialogMode"
+      :transaction="editingTransaction"
+      @saved="onTransactionSaved"
+      @close="showTransactionDialog = false"
+    />
   </div>
 </template>

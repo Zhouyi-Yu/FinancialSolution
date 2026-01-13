@@ -68,33 +68,125 @@ namespace FinanceApi.Controllers
         }
 
         [HttpGet("trends")]
-        public async Task<ActionResult<TrendsDto>> GetTrends([FromQuery] Guid budgetSpaceId, [FromQuery] int months = 6)
+        public async Task<ActionResult<TrendsDto>> GetTrends([FromQuery] Guid budgetSpaceId, [FromQuery] string range = "6M")
         {
             var end = DateTime.UtcNow;
-            var start = new DateTime(end.Year, end.Month, 1).AddMonths(-(months - 1));
+            DateTime start;
+            string granularity = "Month"; // Hour, Day, Week, Month
 
-            var data = await _context.Transactions
+            switch (range.ToUpper())
+            {
+                case "1D":
+                    start = end.AddHours(-24);
+                    granularity = "Hour";
+                    break;
+                case "1W":
+                    start = end.AddDays(-7);
+                    granularity = "Day";
+                    break;
+                case "1M":
+                    start = end.AddDays(-30);
+                    granularity = "Day";
+                    break;
+                case "3M":
+                    start = end.AddMonths(-3);
+                    granularity = "Week";
+                    break;
+                case "6M":
+                    start = end.AddMonths(-6);
+                    granularity = "Month";
+                    break;
+                case "MAX":
+                    start = DateTime.MinValue; // Will be clamped by query
+                    granularity = "Month";
+                    break;
+                default: // Fallback to 6M logic
+                    start = end.AddMonths(-6);
+                    granularity = "Month";
+                    break;
+            }
+
+            // Ensure UTC kind for Npgsql
+            if (start.Kind == DateTimeKind.Unspecified && start != DateTime.MinValue)
+                start = DateTime.SpecifyKind(start, DateTimeKind.Utc);
+            
+            // 1. Fetch Raw Data (Client-side evaluation for grouping flexibility)
+            var query = _context.Transactions
                 .Where(t => t.BudgetSpaceId == budgetSpaceId && 
-                            !t.IsDeleted &&
-                            t.Date >= start)
-                .GroupBy(t => new { t.Date.Year, t.Date.Month })
-                .Select(g => new 
-                { 
-                    Year = g.Key.Year, 
-                    Month = g.Key.Month,
-                    Income = g.Where(x => x.Type == TransactionType.Income).Sum(x => x.AmountInBase),
-                    Expense = g.Where(x => x.Type == TransactionType.Expense).Sum(x => x.AmountInBase)
-                })
-                .OrderBy(x => x.Year).ThenBy(x => x.Month)
+                            !t.IsDeleted);
+            
+            if (range.ToUpper() != "MAX")
+            {
+                query = query.Where(t => t.Date >= start);
+            }
+
+            var rawData = await query
+                .Select(t => new { t.Date, t.Type, t.AmountInBase })
                 .ToListAsync();
 
-            var points = data.Select(d => new TrendPoint 
-            { 
-                Month = $"{d.Year}-{d.Month:D2}",
-                Income = d.Income,
-                Expense = d.Expense,
-                Net = d.Income - d.Expense
-            }).ToList();
+            // 2. Group Data in Memory
+            IEnumerable<dynamic> groupedData;
+            
+            if (granularity == "Hour")
+            {
+                groupedData = rawData
+                    .GroupBy(t => new { t.Date.Date, t.Date.Hour })
+                    .Select(g => new 
+                    { 
+                        Label = $"{g.Key.Hour}:00",
+                        SortKey = g.Key.Date.AddHours(g.Key.Hour),
+                        Income = g.Where(x => x.Type == TransactionType.Income).Sum(x => x.AmountInBase),
+                        Expense = g.Where(x => x.Type == TransactionType.Expense).Sum(x => x.AmountInBase)
+                    });
+            }
+            else if (granularity == "Day")
+            {
+                groupedData = rawData
+                    .GroupBy(t => t.Date.Date)
+                    .Select(g => new 
+                    { 
+                        Label = g.Key.ToString("MM-dd"),
+                        SortKey = g.Key,
+                        Income = g.Where(x => x.Type == TransactionType.Income).Sum(x => x.AmountInBase),
+                        Expense = g.Where(x => x.Type == TransactionType.Expense).Sum(x => x.AmountInBase)
+                    });
+            }
+            else if (granularity == "Week")
+            {
+                // Group by start of week (Sunday)
+                groupedData = rawData
+                    .GroupBy(t => t.Date.Date.AddDays(-(int)t.Date.DayOfWeek))
+                    .Select(g => new 
+                    { 
+                        Label = g.Key.ToString("MM-dd"),
+                        SortKey = g.Key,
+                        Income = g.Where(x => x.Type == TransactionType.Income).Sum(x => x.AmountInBase),
+                        Expense = g.Where(x => x.Type == TransactionType.Expense).Sum(x => x.AmountInBase)
+                    });
+            }
+            else // Month
+            {
+                groupedData = rawData
+                    .GroupBy(t => new { t.Date.Year, t.Date.Month })
+                    .Select(g => new 
+                    { 
+                        Label = $"{g.Key.Year}-{g.Key.Month:D2}",
+                        SortKey = new DateTime(g.Key.Year, g.Key.Month, 1),
+                        Income = g.Where(x => x.Type == TransactionType.Income).Sum(x => x.AmountInBase),
+                        Expense = g.Where(x => x.Type == TransactionType.Expense).Sum(x => x.AmountInBase)
+                    });
+            }
+
+            var points = groupedData
+                .OrderBy(x => x.SortKey)
+                .Select(d => new TrendPoint 
+                { 
+                    Month = d.Label, // Reusing 'Month' property for Label to avoid breaking DTO
+                    Income = d.Income,
+                    Expense = d.Expense,
+                    Net = d.Income - d.Expense
+                })
+                .ToList();
 
             return Ok(new TrendsDto { Points = points });
         }

@@ -12,6 +12,11 @@ const router = createRouter({
             component: LoginView
         },
         {
+            path: '/register',
+            name: 'register',
+            component: () => import('../views/Auth/RegisterView.vue')
+        },
+        {
             path: '/',
             name: 'dashboard',
             component: DashboardView,
@@ -21,7 +26,7 @@ const router = createRouter({
     ]
 })
 
-router.beforeEach((to, from, next) => {
+router.beforeEach((to, _from, next) => {
     const auth = useAuthStore()
     if (to.meta.requiresAuth && !auth.isAuthenticated) {
         next('/login')

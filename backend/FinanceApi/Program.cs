@@ -12,6 +12,8 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddScoped<FinanceApi.Services.AuthService>();
 builder.Services.AddScoped<FinanceApi.Services.TransactionService>();
+builder.Services.AddScoped<FinanceApi.Services.PdfParserService>();
+builder.Services.AddHealthChecks();
 
 // Database Context (PostgreSQL)
 builder.Services.AddDbContext<AppDbContext>(options =>

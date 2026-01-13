@@ -114,5 +114,15 @@ namespace FinanceApi.Services
             await _context.SaveChangesAsync();
             return true;
         }
+
+        public async Task<HashSet<string>> GetExistingHashesAsync(Guid budgetSpaceId)
+        {
+            var hashes = await _context.Transactions
+                .Where(t => t.BudgetSpaceId == budgetSpaceId && !t.IsDeleted && t.DeduplicationHash != null)
+                .Select(t => t.DeduplicationHash!)
+                .ToListAsync();
+            
+            return new HashSet<string>(hashes);
+        }
     }
 }

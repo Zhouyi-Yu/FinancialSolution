@@ -45,5 +45,8 @@ namespace FinanceApi.Models.Entities
 
         // Navigation
         public ICollection<TransactionTag> TransactionTags { get; set; } = new List<TransactionTag>();
+
+        // For PDF import duplicate detection
+        public string? DeduplicationHash { get; set; }
     }
 }

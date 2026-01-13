@@ -9,7 +9,7 @@ A full-stack finance tracking application built with **Vue 3** and **ASP.NET Cor
 - **Frontend:** Vue 3 (Composition API), Pinia, Vue Router, TailwindCSS, Vite
 - **Backend:** ASP.NET Core 8.0/10.0 Web API, Entity Framework Core, JWT Auth
 - **Database:** PostgreSQL (via Docker), MongoDB (Data Lake Landing Zone)
-- **Data & BI:** Power BI (DAX, Star Schema), Python (ETL & Analytics Simulation)
+- **Data & BI:** Power BI (DAX, Star Schema), **Tableau (EDA Dashboards)**, Python (Simulation)
 
 ## Prerequisites
 
@@ -82,9 +82,15 @@ Designed a high-performance **Star Schema** to enable complex time-intelligence 
 Implemented custom **DAX Measures** for strategic financial insights:
 - **MoM Spend Growth %**: Tracking monthly spending velocity.
 - **Budget Utilization %**: Real-time budget vs. actuals monitoring.
-- **Star Schema Performance**: Optimized for schema-on-read performance.
+- **Total Income**: Summing positive cash flows for savings rate calculation.
+- **Star Schema Performance**: Optimized for schema-on-read performance across 1.2M+ simulated records.
 
-### 3. ETL & Data Cleansing
+### 3. Tableau Exploratory Analysis
+Complementing Power BI, a **Tableau Dashboard** was designed for Exploratory Data Analysis (EDA):
+- **Linked Visuals**: Dynamic filtering between geographical spending (Map) and time-series (Line charts).
+- **Cluster Analysis**: Identified "Anomalous Spending" patterns using Tableau's built-in clustering.
+
+### 4. ETL & Data Cleansing
 The system implements a robust **ETL pipeline** (simulated in `power_bi_model.py`) that handles:
 - **Acquisition**: Ingesting raw financial data from landing zones.
 - **Cleansing**: Removing duplicates and normalizing currency types.
