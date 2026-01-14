@@ -5,7 +5,7 @@ import DashboardCard from '../../components/DashboardCard.vue'
 import LineChart from '../../components/LineChart.vue'
 import PdfImportDialog from '../../components/PdfImportDialog.vue'
 import TransactionFormDialog from '../../components/TransactionFormDialog.vue'
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted, watch, computed } from 'vue'
 import axios from 'axios'
 
 const auth = useAuthStore()
@@ -25,6 +25,14 @@ const isLoading = ref(true)
 
 const timeRanges = ['1D', '1W', '1M', '3M', '6M', 'Max']
 const selectedTimeRange = ref('6M')
+const isChartsMerged = ref(false)
+
+const netIncomeTrend = computed(() => {
+  return incomeTrend.value.map((inc, i) => {
+    const exp = expenseTrend.value[i] || 0
+    return inc - exp
+  })
+})
 
 watch(selectedTimeRange, async () => {
   if (currentBudgetSpaceId.value) {
@@ -63,7 +71,12 @@ onMounted(async () => {
         axios.get(`http://localhost:5194/api/transactions?budgetSpaceId=${spaceId}&pageSize=5`)
       ])
 
-      monthlyData.value = summaryResp.data
+      // Fix: Map backend DTO (IncomeTotal) to frontend state (income)
+      monthlyData.value = {
+        income: summaryResp.data.incomeTotal,
+        expense: summaryResp.data.expenseTotal,
+        net: summaryResp.data.net
+      }
       recentTransactions.value = transResp.data.items || []
       
       // Fetch trends separately to use the shared function
@@ -82,14 +95,19 @@ async function refreshDashboard() {
     const now = new Date()
     const monthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
     
-    // Parallel requests
-    const [summaryResp, transResp] = await Promise.all([
-      axios.get(`http://localhost:5194/api/Analytics/monthlySummary?budgetSpaceId=${currentBudgetSpaceId.value}&month=${monthStr}`),
-      axios.get(`http://localhost:5194/api/transactions?budgetSpaceId=${currentBudgetSpaceId.value}&pageSize=5`)
-    ])
+      // Parallel requests
+      const [summaryResp, transResp] = await Promise.all([
+        axios.get(`http://localhost:5194/api/Analytics/monthlySummary?budgetSpaceId=${currentBudgetSpaceId.value}&month=${monthStr}`),
+        axios.get(`http://localhost:5194/api/transactions?budgetSpaceId=${currentBudgetSpaceId.value}&pageSize=5`)
+      ])
 
-    monthlyData.value = summaryResp.data
-    recentTransactions.value = transResp.data.items || []
+      // Fix: Map backend DTO (IncomeTotal) to frontend state (income)
+      monthlyData.value = {
+        income: summaryResp.data.incomeTotal,
+        expense: summaryResp.data.expenseTotal,
+        net: summaryResp.data.net
+      }
+      recentTransactions.value = transResp.data.items || []
     
     await fetchTrends()
   } finally {
@@ -222,30 +240,69 @@ function logout() {
           </button>
         </div>
     </div>
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-      <DashboardCard title="Cash Flow Trend">
-        <div v-if="isLoading" class="h-64 flex items-center justify-center">
-          <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-finance-cyan"></div>
-        </div>
-        <LineChart 
-          v-else
-          :data="incomeTrend"
-          :labels="trendLabels" 
-          color="#10B981"
-        />
-      </DashboardCard>
+    <div class="relative mb-6">
       
-      <DashboardCard title="Expense Trend">
-        <div v-if="isLoading" class="h-64 flex items-center justify-center">
-          <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-finance-cyan"></div>
-        </div>
-        <LineChart 
-          v-else
-          :data="expenseTrend"
-          :labels="trendLabels" 
-          color="#EF4444"
-        />
-      </DashboardCard>
+      <!-- Unified Interactions Button -->
+      <button 
+        @click="isChartsMerged = !isChartsMerged"
+        class="absolute left-1/2 z-20 transition-all duration-500 ease-in-out
+               bg-finance-card border border-white/10 rounded-full p-2 
+               hover:bg-finance-cyan hover:text-black hover:scale-110 shadow-xl group"
+        :class="isChartsMerged ? 'top-0 -translate-y-1/2' : 'top-1/2 -translate-y-1/2 -translate-x-1/2'"
+        :title="isChartsMerged ? 'Split View' : 'Merge View'"
+      >
+        <svg v-if="!isChartsMerged" class="w-5 h-5 text-finance-muted group-hover:text-black transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+        </svg>
+        <svg v-else class="w-5 h-5 text-finance-muted group-hover:text-black transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1v4m0-4h-4m4 4l-5-5" />
+        </svg>
+      </button>
+
+      <!-- Charts Grid -->
+      <div 
+        class="grid gap-6 transition-all duration-500 ease-in-out"
+        :class="isChartsMerged ? 'grid-cols-1 pt-6' : 'grid-cols-1 lg:grid-cols-2'"
+      >
+        <!-- Cash Flow (Hidden in Merged) -->
+        <DashboardCard v-if="!isChartsMerged" title="Cash Flow">
+          <div v-if="isLoading" class="h-64 flex items-center justify-center">
+             <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-finance-cyan"></div>
+          </div>
+          <LineChart 
+            v-else
+            :data="incomeTrend"
+            :labels="trendLabels" 
+            color="#10B981"
+          />
+        </DashboardCard>
+        
+        <!-- Expenses (Hidden in Merged) -->
+        <DashboardCard v-if="!isChartsMerged" title="Expenses">
+          <div v-if="isLoading" class="h-64 flex items-center justify-center">
+             <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-finance-cyan"></div>
+          </div>
+          <LineChart 
+            v-else
+            :data="expenseTrend"
+            :labels="trendLabels" 
+            color="#EF4444"
+          />
+        </DashboardCard>
+
+        <!-- Net Income (Visible Only in Merged) -->
+        <DashboardCard v-if="isChartsMerged" title="Net Income">
+           <div v-if="isLoading" class="h-64 flex items-center justify-center">
+             <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-finance-cyan"></div>
+           </div>
+           <LineChart 
+             v-else
+             :data="netIncomeTrend"
+             :labels="trendLabels" 
+             color="#3B82F6"
+           />
+        </DashboardCard>
+      </div>
     </div>
 
     <!-- Recent Transactions (Full Width) -->

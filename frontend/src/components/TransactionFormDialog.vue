@@ -53,7 +53,8 @@ async function handleSubmit() {
       type: form.value.type === 'Income' ? 0 : 1,
       amount: parseFloat(form.value.amount.toString()),
       currency: form.value.currency,
-      date: new Date(form.value.date as string).toISOString(),
+      // Fix: Send Noon UTC to prevent timezone shifts (e.g. Jan 10 -> Jan 9 17:00)
+      date: new Date(`${form.value.date}T12:00:00Z`).toISOString(),
       merchant: form.value.merchant,
       note: form.value.note
     }
