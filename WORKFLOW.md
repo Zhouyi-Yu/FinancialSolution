@@ -16,6 +16,13 @@ Every request from the Frontend passes through these stations in order. If a che
 
 ---
 
+## 🛠️ CI/CD Enforcement (The Quality Gate)
+Our GitHub Actions are configured with a **"Test-Before-Deploy"** gate. 
+*   **Safety**: Deployment to AWS is automatically blocked if any Unit Tests (e.g., `WorkforceManagerTests`) fail.
+*   **Integrity**: This ensures that breaking changes in the business logic never reach the production environment.
+
+---
+
 ## 🕹️ Controllers and Actions (The Functional Entry Points)
 
 | Controller | Primary Actions | Responsibility |
