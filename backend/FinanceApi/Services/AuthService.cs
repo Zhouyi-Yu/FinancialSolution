@@ -55,6 +55,18 @@ namespace FinanceApi.Services
                 Role = BudgetRole.Owner
             };
             _context.BudgetSpaceMembers.Add(membership);
+            
+            // Seed default categories (Procore "Cost Catalog" inspired baseline)
+            var defaultCategories = new List<Category>
+            {
+                new Category { Name = "Housing", AppliesTo = CategoryType.Expense, BudgetSpace = budgetSpace },
+                new Category { Name = "Transportation", AppliesTo = CategoryType.Expense, BudgetSpace = budgetSpace },
+                new Category { Name = "Food & Dining", AppliesTo = CategoryType.Expense, BudgetSpace = budgetSpace },
+                new Category { Name = "Utilities", AppliesTo = CategoryType.Expense, BudgetSpace = budgetSpace },
+                new Category { Name = "Salary", AppliesTo = CategoryType.Income, BudgetSpace = budgetSpace },
+                new Category { Name = "Freelance", AppliesTo = CategoryType.Income, BudgetSpace = budgetSpace }
+            };
+            _context.Categories.AddRange(defaultCategories);
 
             await _context.SaveChangesAsync();
 

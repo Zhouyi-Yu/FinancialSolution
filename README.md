@@ -63,6 +63,7 @@ Designed for high-availability deployment on AWS to demonstrate cloud-native apt
 - **Authentication:** Register/Login with JWT.
 - **Budget Spaces:** Isolate your finances.
 - **Transactions:** Create, edit, delete, and filter income/expenses.
+- **Recurring Expense Catalog:** Procore-inspired "Cost Catalog" to save templates for frequent transactions.
 - **Analytics:** Monthly summaries and category breakdowns.
 - **Power BI Integration:** Professional data modeling with Star Schema and DAX measures.
 - **ETL Pipelines:** Robust data ingestion and cleansing logic for diverse data sources.

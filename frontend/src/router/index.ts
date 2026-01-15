@@ -22,6 +22,22 @@ const router = createRouter({
             component: DashboardView,
             meta: { requiresAuth: true }
         },
+        {
+            path: '/dashboard',
+            redirect: '/'
+        },
+        {
+            path: '/transactions',
+            name: 'transactions',
+            component: () => import('../views/Transactions/TransactionsView.vue'),
+            meta: { requiresAuth: true }
+        },
+        {
+            path: '/categories',
+            name: 'categories',
+            component: () => import('../views/Categories/CategoriesView.vue'),
+            meta: { requiresAuth: true }
+        }
         // { path: '/register', ... }
     ]
 })

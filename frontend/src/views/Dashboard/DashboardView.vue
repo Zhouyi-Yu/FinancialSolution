@@ -185,6 +185,9 @@ function logout() {
           </svg>
           <span>Import Statement</span>
         </button>
+        <button @click="router.push('/categories')" class="px-4 py-2 bg-finance-card border border-gray-700 text-finance-text rounded hover:bg-gray-800 transition-colors text-sm">
+          Categories
+        </button>
         <button @click="logout" class="px-4 py-2 bg-finance-card border border-gray-700 text-finance-text rounded hover:bg-gray-800 transition-colors text-sm">
           Logout
         </button>
@@ -308,6 +311,9 @@ function logout() {
     <!-- Recent Transactions (Full Width) -->
     <div class="mb-6">
       <DashboardCard title="Recent Transactions">
+        <template #extra>
+          <router-link to="/transactions" class="text-xs text-finance-cyan hover:underline font-bold">View All →</router-link>
+        </template>
         <div v-if="isLoading" class="text-center text-finance-muted py-12">
           <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-finance-cyan mx-auto"></div>
           <p class="mt-4">Loading transactions...</p>

@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.4.0] - 2026-01-15
+
+### Added
+- **Recurring Expense Catalog**: Procore-inspired "Cost Catalog" feature allowing users to save transactions as templates.
+- **Workflow Automation**: One-click "Apply" to auto-fill transaction forms from the catalog, reducing repetitive data entry.
+- **Catalog Hint System**: Interactive walkthrough component within the transaction form for first-time users.
+
+### Fixed
+- **Navigation Inconsistency**: Resolved critical routing bug where `/dashboard` redirect was missing, causing blank screens on "Back" navigation.
+- **Backend Serialization**: Fixed `500 Internal Server Error` in `TransactionTemplates` caused by JSON circular references and excessive EF Core Includes.
+- **Auth Reliability**: Corrected backend `OwnerUserId` property reference mismatches in template management endpoints.
+- **Category Synchronization**: Ensured categories are correctly fetched and displayed within the transaction dialog alongside catalog items.
+
 ## [1.3.0] - 2026-01-13
 
 ### Added

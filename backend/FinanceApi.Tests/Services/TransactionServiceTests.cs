@@ -81,5 +81,71 @@ namespace FinanceApi.Tests.Services
             Assert.Equal(15, count);
             Assert.Equal(5, results.Count());
         }
+
+        [Fact]
+        public async Task GetTransactionsAsync_ShouldNeverReturnSoftDeletedRecords()
+        {
+            // Arrange
+            var spaceId = Guid.NewGuid();
+            var tx = new Transaction 
+            { 
+                BudgetSpaceId = spaceId, 
+                Amount = 100, 
+                IsDeleted = true, // Soft deleted
+                Date = DateTime.Now 
+            };
+            _context.Transactions.Add(tx);
+            await _context.SaveChangesAsync();
+
+            // Act
+            var (results, count) = await _service.GetTransactionsAsync(spaceId, 1, 10, null, null, null, null, null);
+
+            // Assert
+            Assert.Equal(0, count);
+            Assert.Empty(results);
+        }
+
+        [Fact]
+        public async Task UpdateAsync_ShouldCorrectlyCalculateBaseAmount()
+        {
+            // Arrange
+            var spaceId = Guid.NewGuid();
+            var tx = new Transaction { Id = Guid.NewGuid(), BudgetSpaceId = spaceId, Amount = 100, ExchangeRateToBase = 1.0m, Date = DateTime.Now };
+            _context.Transactions.Add(tx);
+            await _context.SaveChangesAsync();
+
+            var updates = new Transaction { Amount = 100, ExchangeRateToBase = 1.35m }; // USD to CAD for example
+
+            // Act
+            var updated = await _service.UpdateAsync(tx.Id, spaceId, updates, null);
+
+            // Assert
+            Assert.NotNull(updated);
+            Assert.Equal(135.0m, updated!.AmountInBase); // Verification of line 87 logic
+        }
+
+        [Fact]
+        public async Task GetTransactionsAsync_ShouldHandleNullMerchantAndNoteInSearch()
+        {
+            // Arrange
+            var spaceId = Guid.NewGuid();
+            _context.Transactions.Add(new Transaction 
+            { 
+                BudgetSpaceId = spaceId, 
+                Amount = 50, 
+                Merchant = null, // Edge case: null merchant
+                Note = "Finding this", 
+                Date = DateTime.Now 
+            });
+            await _context.SaveChangesAsync();
+
+            // Act
+            var (results, count) = await _service.GetTransactionsAsync(spaceId, 1, 10, null, null, null, null, "finding");
+
+            // Assert
+            Assert.Equal(1, count);
+            Assert.Single(results);
+        }
     }
 }
+

@@ -13,6 +13,7 @@ namespace FinanceApi.Data
         public DbSet<Category> Categories { get; set; }
         public DbSet<Tag> Tags { get; set; }
         public DbSet<Transaction> Transactions { get; set; }
+        public DbSet<TransactionTemplate> TransactionTemplates { get; set; }
         public DbSet<TransactionTag> TransactionTags { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
